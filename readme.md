@@ -15,7 +15,9 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+
   --host HOST           Enter hostname here (or ip address). If you specify this then this means that you are client (you will initiate tcp connection as client). If not specified, you will host a server
+  
   --port PORT           Which port to use when connecting/starting the server. Default is 5005
 
 
