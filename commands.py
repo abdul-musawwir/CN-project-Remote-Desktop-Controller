@@ -1,41 +1,20 @@
-from pynput import mouse, keyboard
-from constants import *
+from config import *
 from mss import mss
 import time
-import math
 from typing import List
+from pynput import mouse, keyboard
 import threading
-
-def vector_subract(a, b):
-    return (a[0] - b[0], a[1] - b[1])
-
-def vector_length(vec):
-    return math.sqrt(vec[0] * vec[0] + vec[1] * vec[1])
-
-def vector_normalize(vec, l = None):
-    if l is None:
-        l = vector_length(vec)
-    if l > 0:
-        return (vec[0] / l, vec[1] / l)
-    else:
-        return (0, 0)
-
-def vector_multiply(vec, m: float):
-    return (vec[0] * m, vec[1] * m)
-
-def vector_round(vec):
-    return (round(vec[0]), round(vec[1]))
+from utility import *
 
 class CommandBase():
+
     def __init__(self, config: dict):
         self.isDone = False
         self.config = config
         self.frame = -1
-        print("Command created", self)
 
     def start(self):
         self.timeStart = time.time()
-        print("Command started", self)
 
     def update(self):
         self.frame += 1
@@ -86,10 +65,13 @@ class CommandMoveMouse(CommandBase):
         return ret
 
 class CommandMouseInput(CommandBase):
+
     def __init__(self, config: dict, isLeft: bool, isDown: bool):
         self.isLeft = isLeft
         self.isDown = isDown
         CommandBase.__init__(self, config)
+
+
     def update(self):
         CommandBase.update(self)
         if self.frame == 0:
@@ -99,13 +81,14 @@ class CommandMouseInput(CommandBase):
                 controller.press(btn)
             else:
                 controller.release(btn)
-        # if self.time() > 0.0:
         self.finish()
+
     def __str__(self):
         return ('Left' if self.isLeft else 'Right') + ' mouse ' + \
                 ('Down' if self.isDown else 'Up')
 
 class CommandKeyboardInput(CommandBase):
+
     def __init__(self, config: dict, keycode: int, isDown: bool):
         self.keycode = keycode
         self.isDown = isDown
@@ -113,6 +96,7 @@ class CommandKeyboardInput(CommandBase):
     
     def update(self):
         CommandBase.update(self)
+
         if self.frame == 0:
             controller = keyboard.Controller()
             kc = keyboard.KeyCode(self.keycode)
@@ -120,13 +104,14 @@ class CommandKeyboardInput(CommandBase):
                 controller.press(kc)
             else:
                 controller.release(kc)
-        # if self.time() > 0.1:
+
         self.finish()
 
     def __str__(self):
         return ('Press ' if self.isDown else 'Release ') + str(self.keycode)
 
 class Commands(threading.Thread):
+
     command_mappings = {
         'MoveMouse': CommandMoveMouse,
         'MouseInput': CommandMouseInput,

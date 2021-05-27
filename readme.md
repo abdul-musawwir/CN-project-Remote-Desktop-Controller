@@ -1,28 +1,20 @@
-# Dependencies
-`pip install twisted mss pillow pynput`
+Run main.py file.
 
-# Usage
-One person must be controller, the other person must be controllee (being controlled). One of those persons must be server, the other one must be client.
+Features:
+-Remote control (Mouse, Keyboard inputs).
+-Screen Sharing.
 
-usage: cli.py [-h] [--host HOST] [--port PORT] {controller,controllee}
+To dos:
+- Id/password authentication. Currently it just needs the ip and port address to connect. 
+- Optimizing Screen sharing. It is laggy now. Will improve it later. 
 
-Starts a control session. You can choose to be controlled, or to control someone, and you need to specify who is server and who is client
-
-positional arguments:
-  {controller,controllee}
-                        Controller: You are the one who controls other computer. 
-                        Controllee: You are the one being controlled
-
-optional arguments:
-  -h, --help            show this help message and exit
-
-  --host HOST           Enter hostname here (or ip address). If you specify this then this means that you are client (you will initiate tcp connection as client). If not specified, you will host a server
-  
-  --port PORT           Which port to use when connecting/starting the server. Default is 5005
+Works on WLAN/LAN. Needs port forwarding to work on internet.
 
 
+Group Members:
+Muhammad Ahmed K180256
+Yusha Arif  K181289
+Musawwir    K180185
 
-# Known issues
-* Platforms other then windows are not tested. In theory this should work.
-* You don't see mouse in controllee's mouse. You should just blindly trust that it is there.
-* In case of multiple montior setup, a mouse can stop between the monitors when moving. If that happens controllee must either move the mouse manually a bit, or restart the software.
+ 
+ 

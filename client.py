@@ -1,31 +1,48 @@
-from protocol_base import ProtocolBase
+
+from protocol import RDC_Protocol
 import tkinter
 from twisted.internet import tksupport, reactor
 import hashlib
 from PIL import ImageTk, Image
 from io import BytesIO
-from constants import *
+from config import *
 import json
 import time
 
+
+
 class FactoryControllerBase:
+
     def __init__(self):
         self.tk = tkinter.Tk()
+        self.tk.title("Remote Desktop Control ")
         tksupport.install(self.tk)
 
     def buildProtocol(self, addr):
-        return ControllerProtocol(self.tk)
+        return RDC_Client_Protocol(self.tk)
 
 
-class ControllerProtocol(ProtocolBase):
+class RDC_Client_Protocol(RDC_Protocol):
+
+    """"
+        Protocol class for the controller. This class implements functions
+        to capture mouse, keyboard events of the controller and render shared snapshots 
+        of controllee's screen.
+          
+    """
+
     def __init__(self, tk):
-        ProtocolBase.__init__(self)
+        RDC_Protocol.__init__(self)
 
         print("Controller init")
         self.root = tkinter.Toplevel(tk)
         self.root.state('zoomed')
-        self.root.protocol("WM_DELETE_WINDOW", self.onCloseClicked)
+        self.root.protocol("WM_DELETE_WINDOW", self.onCancel)
         self.lastReceivedTime = time.time()
+
+        """
+            ...... Tkinter gui form 
+        """
 
         frame = tkinter.Frame(self.root)
         frame.pack()
@@ -50,21 +67,74 @@ class ControllerProtocol(ProtocolBase):
 
         self.label = tkinter.Label(self.root)
         self.label.pack(fill=tkinter.BOTH, expand=True)
-        # self.label.bind('<Motion>', self.onMouseMoved)
-        self.root.bind('<Key>', self.onKeyDown)
-        self.root.bind('<KeyRelease>', self.onKeyUp)
-        self.label.bind('<Button>', self.onMouseDown)
-        self.label.bind('<ButtonRelease>', self.onMouseUp)
+
+        self.root.bind('<Key>', self.onKeyPressed)
+        self.root.bind('<KeyRelease>', self.onKeyReleased)
+        self.label.bind('<Button>', self.onMousePressed)
+        self.label.bind('<ButtonRelease>', self.onMouseReleased)
+
+
+
+    def getMousePosition(self, x, y):
+        labelSize = self.getLabelSize()
+
+        return (x / labelSize[0], y / labelSize[1])
+
+
+    def onMousePressed(self, e):
+
+        """
+            Gets the mouse x, y coodinates and finds the actual local location.
+        """
+
+        pos = self.getMousePosition(e.x, e.y)
+
+        self.sendCommand('MoveMouse', pos[0], pos[1])
+
+        self.sendCommand('MouseInput', e.num == 1, True)
+
+    def onMouseReleased(self, e):
+
+        location = self.getMousePosition(e.x, e.y)
+        self.sendCommand('MoveMouse', location[0], location[1])
+        self.sendCommand('MouseInput', e.num == 1, False)
+
     
+    def onKeyPressed(self, e):
+        """
+            Wrapper for key  event. True value for key pressed.
+        """
+        self.sendCommand('KeyboardInput', e.keycode, True)
+
+    
+    def onKeyReleased(self, e=None):
+        """
+            Wrapper for key down event . False value for key not pressed
+        """
+        self.sendCommand('KeyboardInput', e.keycode, False)
+
+
+    def onCancel(self):
+        """
+            CLoses the TCP connection
+        """
+
+        self.transport.abortConnection()
+
+        reactor.stop()
+
+    def getLabelSize(self):
+        return (self.label.winfo_width(), self.label.winfo_height())
+
     def changeScale(self, newScale: str):
         self.setValue(VAR_SCALE, float(newScale))
-    
+
     def changeMonitor(self, newMonitor: str):
         self.setValue(VAR_MONITOR, int(newMonitor))
-    
+
     def changeUpdateCommands(self):
         self.setValue(VAR_SHOULD_UPDATE_COMMANDS, self.updateVar.get())
-    
+
     def setValue(self, variable, value):
         toSend = COMMAND_SET_VAR.encode('ascii')
         toSend += json.dumps({
@@ -72,61 +142,29 @@ class ControllerProtocol(ProtocolBase):
             'value': value
         }).encode('ascii')
         self.writeMessage(toSend)
-    
+
     def sendCommand(self, commandName, *args):
         toSend = COMMAND_NEW_COMMAND.encode('ascii')
         toSend += json.dumps([commandName, *args]).encode('ascii')
         self.writeMessage(toSend)
 
-    def getLocalPosition(self, x, y):
-        labelSize = self.getLabelSize()
-        return (x / labelSize[0], y / labelSize[1])
-
-    def onMouseMoved(self, event):
-        print(event.x, event.y)
-    
-    def sendMouseEvent(self, event, isDown: bool):
-        location = self.getLocalPosition(event.x, event.y)
-        self.sendCommand('MoveMouse', location[0], location[1])
-        self.sendCommand('MouseInput', event.num == 1, isDown)
-
-    def onMouseDown(self, event):
-        self.sendMouseEvent(event, True)
-
-    def onMouseUp(self, event):
-        self.sendMouseEvent(event, False)
-    
-    def sendKeyEvent(self, event, isDown: bool):
-        self.sendCommand('KeyboardInput', event.keycode, isDown)
-    
-    def onKeyDown(self, event):
-        self.sendKeyEvent(event, True)
-    
-    def onKeyUp(self, event=None):
-        self.sendKeyEvent(event, False)
-
-    def onCloseClicked(self):
-        self.transport.abortConnection()
-        reactor.stop()
-
-    def getLabelSize(self):
-        return (self.label.winfo_width(), self.label.winfo_height())
-
     def messageReceived(self, data: bytes):
-        shouldAskMore = False
-        newSize = self.getLabelSize()
+
+        size = self.getLabelSize()
+
         img = Image.open(BytesIO(data))
-        oldSize = img.size
-        img = img.resize(newSize)
+        img = img.resize(size)
+
         self.currentImage = ImageTk.PhotoImage(img)
         self.label.configure(image=self.currentImage)
         self.fpsLabel['text'] = '%.1f' % (1/(time.time() - self.lastReceivedTime))
         self.lastReceivedTime = time.time()
+
         self.writeMessage(COMMAND_SEND_SCREENSHOT.encode('ascii'))
 
     def connectionLost(self, reason):
         print('Connection lost', reason)
-        ProtocolBase.connectionLost(self)
+        RDC_Protocol.connectionLost(self)
         if self.root is not None:
             self.root.destroy()
             self.root = None

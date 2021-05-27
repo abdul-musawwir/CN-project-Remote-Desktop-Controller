@@ -4,7 +4,7 @@ import struct
 
 NUM_FORMAT = '<Q'
 
-class ProtocolBase(Protocol):
+class RDC_Protocol(Protocol):
     def __init__(self):
         self.buffer = bytes([])
         self.receiveBuffer = bytes([])
